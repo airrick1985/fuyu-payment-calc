@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>富宇森之樹｜付款試算單</title>
+<style>
+  :root{
+    --bg:#F4F6F3; --surface:#FFFFFF; --ink:#22302A; --muted:#67766E;
+    --line:#DCE4DE; --accent:#2E6B4E; --accent-ink:#FFFFFF;
+    --accent-soft:#E9F1EB; --warn:#B4552D;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#141A17; --surface:#1C2420; --ink:#E7EDE9; --muted:#94A39B;
+      --line:#2C3630; --accent:#5FA97F; --accent-ink:#0F1712; --accent-soft:#22352A; --warn:#E08A63; }
+  }
+  :root[data-theme="dark"]{ --bg:#141A17; --surface:#1C2420; --ink:#E7EDE9; --muted:#94A39B;
+    --line:#2C3630; --accent:#5FA97F; --accent-ink:#0F1712; --accent-soft:#22352A; --warn:#E08A63; }
+  :root[data-theme="light"]{ --bg:#F4F6F3; --surface:#FFFFFF; --ink:#22302A; --muted:#67766E;
+    --line:#DCE4DE; --accent:#2E6B4E; --accent-ink:#FFFFFF; --accent-soft:#E9F1EB; --warn:#B4552D; }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif; font-size:14px; line-height:1.5}
+  .wrap{max-width:1150px; margin:0 auto; padding:20px 16px 48px}
+
+  .layout{display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start}
+  @media (max-width:900px){ .layout{grid-template-columns:1fr} }
+
+  /* ---- 輸入面板 ---- */
+  .panel{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px 16px;
+    display:flex; flex-direction:column; gap:8px}
+  .panel h2{font-size:12px; letter-spacing:.16em; color:var(--muted); margin:8px 0 2px; font-weight:700}
+  .panel h2:first-child{margin-top:0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .f{display:flex; flex-direction:column; gap:2px}
+  .f label{font-size:12px; color:var(--muted)}
+  .f input[type=number], .f input[type=text]{
+    width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px;
+    background:var(--bg); color:var(--ink); font:inherit; text-align:right; font-variant-numeric:tabular-nums}
+  .f input[type=text]{text-align:left}
+  .f input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .warn-note{font-size:12px; color:var(--warn); font-weight:600; display:none}
+  .warn-note.show{display:block}
+  .radio-row{display:flex; gap:6px}
+  .radio-row label{flex:1; text-align:center; border:1px solid var(--line); border-radius:6px;
+    padding:6px 2px; cursor:pointer; background:var(--bg); font-size:13px}
+  .radio-row input{position:absolute; opacity:0; pointer-events:none}
+  .radio-row label:has(input:checked){background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:700}
+  .radio-row label:has(input:focus-visible){outline:2px solid var(--accent); outline-offset:1px}
+
+  /* ---- 工具列 + 方案 ---- */
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px}
+  button{font:inherit; border-radius:7px; padding:8px 16px; cursor:pointer;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink)}
+  button.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
+  button:hover{filter:brightness(1.05)}
+  button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .chips{display:flex; gap:6px; flex-wrap:wrap}
+  .chip{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line);
+    background:var(--surface); border-radius:16px; padding:4px 6px 4px 12px; font-size:13px}
+  .chip .name{cursor:pointer; font-weight:600}
+  .chip .name:hover{color:var(--accent)}
+  .chip .x{cursor:pointer; color:var(--muted); border:none; background:none; padding:0 6px; font-size:14px; border-radius:50%}
+  .chip .x:hover{color:var(--warn)}
+  .chips .none{color:var(--muted); font-size:13px}
+
+  /* ---- A4 預覽 ---- */
+  .stage{display:flex; flex-direction:column; gap:12px; min-width:0}
+  .sheetWrap{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; display:flex; justify-content:center}
+  canvas#sheet{width:100%; max-width:560px; height:auto; box-shadow:0 2px 14px rgba(0,0,0,.12); border-radius:3px}
+
+  @media print{
+    @page{size:A4 portrait; margin:0}
+    body{background:#fff}
+    .panel, .toolbar, header.appHead{display:none !important}
+    .wrap{max-width:none; padding:0; margin:0}
+    .layout{display:block}
+    .sheetWrap{border:none; padding:0; border-radius:0; display:block}
+    canvas#sheet{width:210mm !important; max-width:none; height:297mm !important; box-shadow:none; border-radius:0; display:block}
+  }
+
+  header.appHead{display:flex; align-items:baseline; gap:12px; margin-bottom:16px; flex-wrap:wrap}
+  .brand{background:var(--accent); color:var(--accent-ink); font-weight:700; letter-spacing:.18em;
+    padding:3px 10px; border-radius:4px; font-size:12px}
+  header.appHead h1{font-size:20px; margin:0; letter-spacing:.04em}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="appHead">
+    <span class="brand" id="brandBadge">富宇・森之樹</span>
+    <h1>付款試算單</h1>
+  </header>
+
+  <div class="layout">
+    <!-- ===== 輸入 ===== -->
+    <div class="panel">
+      <h2>基本</h2>
+      <div class="f"><label for="planName">方案名稱</label><input type="text" id="planName" value="方案 A"></div>
+      <div class="grid2">
+        <div class="f"><label for="price">成交價（萬）</label><input type="number" id="price" value="" placeholder="輸入金額" step="1" min="0"></div>
+        <div class="f"><label for="signPct">簽約金（%）</label><input type="number" id="signPct" value="5" step="0.5" min="0"></div>
+        <div class="f"><label for="loanPct">貸款成數（%）</label><input type="number" id="loanPct" value="80" step="1" min="0"></div>
+        <div class="f"><label for="selfPct">自備款（%）</label><input type="number" id="selfPct" value="15" step="0.5" min="0"></div>
+      </div>
+      <div class="warn-note" id="pctWarn">合計不等於 100%</div>
+
+      <h2>自備款方式</h2>
+      <div class="radio-row" role="radiogroup" aria-label="自備款方式">
+        <label><input type="radio" name="payMode" value="installment" checked>公司分期</label>
+        <label id="lumpOpt" hidden><input type="radio" name="payMode" value="lump">一次付清</label>
+      </div>
+      <div class="grid2" id="instFields">
+        <div class="f"><label for="instN">期數</label><input type="number" id="instN" value="12" step="1" min="1"></div>
+        <div class="f"><label for="instGap">間隔（月）</label><input type="number" id="instGap" value="3" step="1" min="1"></div>
+        <div class="f"><label for="instRate">利率（%）</label><input type="number" id="instRate" value="3.3" step="0.05" min="0"></div>
+        <div class="f" id="discountField" hidden><label for="discountPct">折讓（%）</label><input type="number" id="discountPct" value="6" step="0.5" min="0"></div>
+      </div>
+
+      <h2>房屋貸款</h2>
+      <div class="grid2">
+        <div class="f"><label for="mortRate">利率（%）</label><input type="number" id="mortRate" value="3.3" step="0.05" min="0"></div>
+        <div class="f"><label for="mortYears">年限（年）</label><input type="number" id="mortYears" value="20" step="1" min="1"></div>
+        <div class="f"><label for="graceYears">寬限（年）</label><input type="number" id="graceYears" value="0" step="1" min="0"></div>
+      </div>
+    </div>
+
+    <!-- ===== A4 預覽 ===== -->
+    <div class="stage">
+      <div class="toolbar">
+        <button class="primary" id="saveBtn">＋ 存方案</button>
+        <button id="printBtn">列印</button>
+        <button id="dlBtn">下載圖片</button>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="sheetWrap"><canvas id="sheet" width="1654" height="2339" aria-label="A4 付款試算單預覽"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var W = 10000;
+  var CW = 1654, CH = 2339, M = 130;           // A4 @200dpi，左右邊距
+  var GREEN = "#2E6B4E", INK = "#26322B", GRAY = "#6C7A72", LINE = "#D8E0DA", GOLD = "#A5812F";
+  var FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif';
+
+  function yuan(x){ return Math.round(x).toLocaleString("zh-TW"); }
+  function wan(x){ var v = Math.round(x*10)/10; return v.toLocaleString("zh-TW",{maximumFractionDigits:1}); }
+  function pmt(P, r, n){
+    if(n <= 0) return 0;
+    if(r === 0) return P/n;
+    var f = Math.pow(1+r, n);
+    return P*r*f/(f-1);
+  }
+
+  function readInputs(){
+    var g = function(id){ return parseFloat($(id).value) || 0; };
+    return {
+      planName: $("planName").value || "方案",
+      price:g("price"), signPct:g("signPct"), loanPct:g("loanPct"), selfPct:g("selfPct"),
+      instN:Math.max(1,Math.round(g("instN"))), instGap:Math.max(1,Math.round(g("instGap"))),
+      instRate:g("instRate"), discountPct:g("discountPct"),
+      mortRate:g("mortRate"), mortYears:Math.max(1,Math.round(g("mortYears"))),
+      graceYears:Math.max(0,Math.round(g("graceYears"))),
+      payMode:document.querySelector("input[name=payMode]:checked").value
+    };
+  }
+
+  function compute(s){
+    var r = {};
+    // 進位規則：簽約金無條件進位、貸款無條件捨去，自備款以差額調整補足
+    r.signAmt = Math.ceil(s.price*s.signPct/100);
+    r.loanAmt = Math.floor(s.price*s.loanPct/100);
+    r.selfAmt = Math.max(0, s.price - r.signAmt - r.loanAmt);
+
+    var perRate = s.instRate/100/12*s.instGap;
+    r.instPay = pmt(r.selfAmt*W, perRate, s.instN);
+    r.instInterest = r.instPay*s.instN - r.selfAmt*W;
+    r.instMonths = s.instN*s.instGap;
+
+    // 一次付清＝付清全部自備款（簽約＋自備，共 20%），折讓以此總額計
+    r.lumpBase = r.signAmt + r.selfAmt;
+    r.discount = r.lumpBase*s.discountPct/100;
+    r.lumpPay = r.lumpBase - r.discount;
+
+    var mr = s.mortRate/100/12, nAll = s.mortYears*12;
+    var nGrace = Math.min(s.graceYears*12, nAll-1);
+    r.gracePay = r.loanAmt*W*mr;
+    r.mortPay = pmt(r.loanAmt*W, mr, nAll-nGrace);
+    r.mortInterest = r.gracePay*nGrace + r.mortPay*(nAll-nGrace) - r.loanAmt*W;
+    r.nAll = nAll; r.nGrace = nGrace;
+
+    r.mortMonthly = nGrace > 0 ? r.gracePay : r.mortPay;
+    r.instMonthly = s.payMode === "installment" ? r.instPay/s.instGap : 0;
+    r.monthTotal = r.mortMonthly + r.instMonthly;
+    r.needCash = s.payMode === "lump" ? r.lumpPay : r.signAmt + r.selfAmt;
+    return r;
+  }
+
+  // ---------- Canvas 繪製 ----------
+  var C = $("sheet"), ctx = C.getContext("2d");
+
+  function font(size, weight){ return (weight||400) + " " + size + 'px ' + FONT; }
+  function text(str, x, y, size, opt){
+    opt = opt || {};
+    ctx.font = font(size, opt.w);
+    ctx.fillStyle = opt.color || INK;
+    ctx.textAlign = opt.align || "left";
+    ctx.fillText(str, x, y);
+  }
+  function rule(y, color){
+    ctx.strokeStyle = color || LINE; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(CW-M, y); ctx.stroke();
+  }
+  function sectionTitle(t, y){
+    text(t, M, y, 30, {w:700, color:GREEN});
+    ctx.strokeStyle = LINE; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(M + ctx.measureText(t).width + 26, y-10);
+    ctx.lineTo(CW-M, y-10); ctx.stroke();
+    return y + 62;
+  }
+  // 左標籤、右數值
+  function row(label, value, y, opt){
+    opt = opt || {};
+    text(label, M, y, 30, {color:GRAY});
+    text(value, CW-M, y, opt.size||32, {w:opt.vw||600, align:"right", color:opt.color||INK});
+    return y + (opt.gap || 58);
+  }
+  // 大字數值列：label + 特大金額 + 單位
+  function bigRow(label, big, unit, y, opt){
+    opt = opt || {};
+    text(label, M, y, 32, {w:600, color:INK});
+    ctx.font = font(30);
+    var uw = unit ? ctx.measureText(unit).width : 0;
+    text(big, CW-M-uw-(unit?12:0), y, 58, {w:700, align:"right", color:opt.color||GREEN});
+    if(unit) text(unit, CW-M, y, 30, {align:"right", color:GRAY});
+    return y + 76;
+  }
+  function rrect(x, y, w, h, r){
+    ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(x, y, w, h, r); }
+    else{ ctx.rect(x, y, w, h); }
+  }
+
+  function draw(){
+    var s = readInputs(), r = compute(s);
+    ctx.clearRect(0, 0, CW, CH);
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, CW, CH);
+
+    // 頁首色帶
+    ctx.fillStyle = GREEN; ctx.fillRect(0, 0, CW, 168);
+    text("富宇・森之樹", M, 105, 52, {w:700, color:"#FFFFFF"});
+    text("付 款 試 算 單", CW-M, 103, 40, {w:500, align:"right", color:"#DCEAE1"});
+
+    var d = new Date();
+    var dateStr = d.getFullYear() + " / " + (d.getMonth()+1) + " / " + d.getDate();
+    var y = 252;
+    text(s.planName, M, y, 36, {w:700});
+    text(dateStr, CW-M, y, 28, {align:"right", color:GRAY});
+
+    // ── 款項結構 ──
+    y = sectionTitle("款項結構", y + 92);
+    var colW = (CW - 2*M)/4;
+    var cols = [
+      ["成交價", wan(s.price), ""],
+      ["簽約金 " + s.signPct + "%", wan(r.signAmt), ""],
+      ["自備款 " + s.selfPct + "%", wan(r.selfAmt), ""],
+      ["銀行貸款 " + (s.loanPct/10) + " 成", wan(r.loanAmt), ""]
+    ];
+    cols.forEach(function(c, i){
+      var cx = M + colW*i;
+      text(c[0], cx, y+6, 28, {color:GRAY});
+      ctx.font = font(28);
+      var uw = ctx.measureText(" 萬").width;
+      text(c[1], cx, y+72, 48, {w:700});
+      ctx.font = font(48, 700);
+      text("萬", cx + ctx.measureText(c[1]).width + 8, y+72, 28, {color:GRAY});
+    });
+    y += 140;
+    rule(y); y += 76;
+
+    // ── 自備款 ──
+    if(s.payMode === "installment"){
+      y = sectionTitle("自備款・公司分期", y);
+      y = bigRow("每期應繳", yuan(r.instPay), "元／期", y+14);
+      y = row("分期方式", s.instN + " 期・每 " + s.instGap + " 個月一期・共 " + r.instMonths + " 個月", y+6);
+      y = row("年利率（比照銀行）", s.instRate + " %", y);
+      y = row("分期總利息", yuan(r.instInterest) + " 元", y);
+    }else{
+      y = sectionTitle("自備款・一次付清（交屋前）", y);
+      y = bigRow("折讓後實付", wan(r.lumpPay), "萬", y+14);
+      y = row("自備款總額 " + (s.signPct + s.selfPct) + "%（簽約＋自備）", wan(r.lumpBase) + " 萬", y+6);
+      y = row("折讓 " + s.discountPct + "%", "− " + wan(r.discount) + " 萬（約 " + yuan(r.discount*W) + " 元）", y, {color:GOLD});
+    }
+    y += 18; rule(y); y += 76;
+
+    // ── 房貸 ──
+    y = sectionTitle("房屋貸款（本息平均攤還）", y);
+    y = bigRow("每月還款", yuan(r.mortPay), "元／月", y+14);
+    y = row("貸款金額", wan(r.loanAmt) + " 萬", y+6);
+    y = row("年限／利率", s.mortYears + " 年（" + r.nAll + " 期）・" + s.mortRate + " %", y);
+    if(r.nGrace > 0){
+      y = row("寬限期 " + s.graceYears + " 年（只繳息）", yuan(r.gracePay) + " 元／月", y);
+    }
+    y = row("房貸總利息", yuan(r.mortInterest) + " 元", y);
+    y += 30;
+
+    // ── 每月負擔色帶 ──
+    var bandH = s.payMode === "installment" ? 172 : 132;
+    ctx.fillStyle = GREEN;
+    rrect(M, y, CW-2*M, bandH, 14); ctx.fill();
+    text("每月負擔合計", M+44, y+82, 34, {w:600, color:"#FFFFFF"});
+    ctx.font = font(30);
+    var unit2 = "元／月";
+    var uw2 = ctx.measureText(unit2).width;
+    text("約 " + yuan(r.monthTotal), CW-M-44-uw2-12, y+84, 56, {w:700, align:"right", color:"#FFFFFF"});
+    text(unit2, CW-M-44, y+82, 30, {align:"right", color:"#CFE3D7"});
+    if(s.payMode === "installment"){
+      text("房貸 " + yuan(r.mortMonthly) + "／月 ＋ 分期均攤 " + yuan(r.instMonthly) + "／月（每 " + s.instGap + " 個月繳 " + yuan(r.instPay) + " 元）",
+        M+44, y+138, 27, {color:"#CFE3D7"});
+    }
+    y += bandH + 82;
+
+    // ── 交屋前需準備 ──
+    var prep = s.payMode === "lump"
+      ? "自備款 " + wan(r.lumpBase) + " 萬 − 折讓 " + wan(r.discount) + " 萬"
+      : "簽約 " + wan(r.signAmt) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）";
+    y = row("交屋前需準備", prep + " ＝ " + wan(r.needCash) + " 萬", y, {size:34, vw:700});
+
+    // ── 審核提醒 ──
+    y += 26;
+    var nH = 104;
+    ctx.fillStyle = "#FBF3E1";
+    rrect(M, y, CW-2*M, nH, 12); ctx.fill();
+    ctx.strokeStyle = "#C9A24B"; ctx.lineWidth = 3;
+    rrect(M, y, CW-2*M, nH, 12); ctx.stroke();
+    var noticeText = s.payMode === "lump"
+      ? "※ 重要提醒：一次付清折讓方案，須送審客戶條件，經公司審核通過後方可簽約。"
+      : "※ 重要提醒：公司分期方案，須送審客戶條件，經公司審核通過後方可簽約。";
+    text(noticeText, CW/2, y + nH/2 + 11, 30, {w:700, align:"center", color:"#7A5A17"});
+
+    // 頁尾
+    rule(CH-118);
+    text("本表僅供試算參考，實際金額與條件以正式合約為準。", M, CH-64, 26, {color:GRAY});
+    text("富宇・森之樹", CW-M, CH-64, 26, {align:"right", color:GRAY});
+    return s;
+  }
+
+  // ---------- 事件 ----------
+  function balance(changed){
+    var g = function(id){ return parseFloat($(id).value) || 0; };
+    if(changed === "selfPct") $("loanPct").value = +(100 - g("signPct") - g("selfPct")).toFixed(1);
+    else $("selfPct").value = +(100 - g("signPct") - g("loanPct")).toFixed(1);
+  }
+  function refresh(){
+    var g = function(id){ return parseFloat($(id).value) || 0; };
+    $("pctWarn").classList.toggle("show", Math.abs(g("signPct")+g("selfPct")+g("loanPct")-100) > 0.01);
+    draw();
+  }
+  ["planName","price","signPct","loanPct","selfPct","instN","instGap","instRate",
+   "discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
+    $(id).addEventListener("input", function(){
+      if(id==="signPct"||id==="loanPct"||id==="selfPct") balance(id);
+      refresh();
+    });
+  });
+  document.querySelectorAll("input[name=payMode]").forEach(function(el){
+    el.addEventListener("change", refresh);
+  });
+
+  // ---------- 一次付清隱藏入口（連點標誌 3 下或 Ctrl+Shift+L） ----------
+  var lumpUnlocked = false;
+  function setLump(on){
+    lumpUnlocked = on;
+    $("lumpOpt").hidden = !on;
+    $("discountField").hidden = !on;
+    if(!on) document.querySelector("input[name=payMode][value=installment]").checked = true;
+    refresh();
+  }
+  var taps = 0, tapTimer = null;
+  $("brandBadge").addEventListener("click", function(){
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(function(){ taps = 0; }, 1200);
+    if(taps >= 3){ taps = 0; setLump(!lumpUnlocked); }
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "l"){
+      e.preventDefault(); setLump(!lumpUnlocked);
+    }
+  });
+
+  $("printBtn").addEventListener("click", function(){ draw(); window.print(); });
+  $("dlBtn").addEventListener("click", function(){
+    var s = draw();
+    var a = document.createElement("a");
+    a.download = "森之樹-" + s.planName + "-付款試算.png";
+    a.href = C.toDataURL("image/png");
+    a.click();
+  });
+
+  // ---------- 方案 ----------
+  var KEY = "fysj-plans-v2";
+  var plans = [];
+  try{ plans = JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ plans = []; }
+  function savePlans(){ try{ localStorage.setItem(KEY, JSON.stringify(plans)); }catch(e){} }
+
+  function nextName(){
+    return "方案 " + String.fromCharCode(65 + (plans.length % 26));
+  }
+  $("saveBtn").addEventListener("click", function(){
+    plans.push(readInputs());
+    savePlans(); renderChips();
+    $("planName").value = nextName();
+    refresh();
+  });
+  function loadPlan(i){
+    var s = plans[i];
+    ["planName","price","signPct","loanPct","selfPct","instN","instGap","instRate",
+     "discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
+      if(s[id] !== undefined) $(id).value = s[id];
+    });
+    if(s.payMode === "lump" && !lumpUnlocked) setLump(true);
+    document.querySelector("input[name=payMode][value=" + s.payMode + "]").checked = true;
+    refresh();
+  }
+  function renderChips(){
+    var box = $("chips");
+    box.innerHTML = "";
+    if(!plans.length){
+      var sp = document.createElement("span");
+      sp.className = "none"; sp.textContent = "尚無已存方案";
+      box.appendChild(sp); return;
+    }
+    plans.forEach(function(p, i){
+      var chip = document.createElement("span"); chip.className = "chip";
+      var nm = document.createElement("span"); nm.className = "name"; nm.textContent = p.planName;
+      nm.title = "載入此方案"; nm.setAttribute("role","button"); nm.tabIndex = 0;
+      nm.addEventListener("click", function(){ loadPlan(i); });
+      nm.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); loadPlan(i); } });
+      var x = document.createElement("button"); x.className = "x"; x.textContent = "×";
+      x.title = "刪除"; x.setAttribute("aria-label","刪除 " + p.planName);
+      x.addEventListener("click", function(){ plans.splice(i,1); savePlans(); renderChips(); });
+      chip.appendChild(nm); chip.appendChild(x);
+      box.appendChild(chip);
+    });
+  }
+
+  if(plans.length) $("planName").value = nextName();
+  refresh();
+  renderChips();
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(draw); }
+})();
+</script>
+</body>
+</html>
