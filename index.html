@@ -327,9 +327,9 @@
 
     // ── 付款明細表 ──
     y = sectionTitle("付款明細（單位：萬）", y + 92);
-    var widths = [130, 200, 220, 220, 210, 180, 234];
-    var xs = [M];
-    widths.forEach(function(w){ xs.push(xs[xs.length-1] + w); });
+    var colN = 7, colW2 = (CW - 2*M) / colN;
+    var xs = [];
+    for(var ci = 0; ci <= colN; ci++) xs.push(M + colW2*ci);
     var h1 = 52, h2 = 64, h3 = 48, tH = h1 + h2 + h3;
     ctx.strokeStyle = LINE; ctx.lineWidth = 2;
     [0, h1, h1+h2, tH].forEach(function(dy){
