@@ -40,7 +40,19 @@
     width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px;
     background:var(--bg); color:var(--ink); font:inherit; text-align:right; font-variant-numeric:tabular-nums}
   .f input[type=text]{text-align:left}
-  .f input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .f select{width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px;
+    background:var(--bg); color:var(--ink); font:inherit}
+  .f input:focus, .f select:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .areaNote{font-size:12px; color:var(--muted)}
+  .parkRow{display:flex; gap:6px; align-items:center}
+  .parkRow input{padding:6px 8px; border:1px solid var(--line); border-radius:6px;
+    background:var(--bg); color:var(--ink); font:inherit; min-width:0}
+  .parkRow input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .parkRow .no{flex:1.2}
+  .parkRow .pr{flex:1; text-align:right; font-variant-numeric:tabular-nums}
+  .parkRow .rm{border:none; background:none; color:var(--muted); cursor:pointer; font-size:16px; padding:2px 6px; border-radius:5px}
+  .parkRow .rm:hover{color:var(--warn)}
+  button.mini{padding:4px 10px; font-size:12.5px; align-self:flex-start}
   .warn-note{font-size:12px; color:var(--warn); font-weight:600; display:none}
   .warn-note.show{display:block}
   .radio-row{display:flex; gap:6px}
@@ -108,6 +120,17 @@
       </div>
       <div class="warn-note" id="pctWarn">合計不等於 100%</div>
 
+      <h2>戶別與車位</h2>
+      <div class="grid2">
+        <div class="f"><label for="stack">棟別</label>
+          <select id="stack"><option value="">— 選擇 —</option></select></div>
+        <div class="f"><label for="floor">樓層</label>
+          <select id="floor"></select></div>
+      </div>
+      <div class="areaNote" id="areaInfo">尚未選擇戶別</div>
+      <div id="parkList" style="display:flex; flex-direction:column; gap:6px"></div>
+      <button class="mini" id="addPark" type="button">＋ 新增車位</button>
+
       <h2>自備款方式</h2>
       <div class="radio-row" role="radiogroup" aria-label="自備款方式">
         <label><input type="radio" name="payMode" value="installment" checked>公司分期</label>
@@ -149,6 +172,12 @@
   var GREEN = "#2E6B4E", INK = "#26322B", GRAY = "#6C7A72", LINE = "#D8E0DA", GOLD = "#A5812F";
   var FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif';
 
+  // 面積資料來源：1141007森之樹誤差表(成屋for銷售版本).xls「總建坪(建物)(坪)」，各棟別 2~22 樓面積相同
+  var AREAS = {A1:38.68, A2:40.5, A3:34.86, A5:38.04, A6:38.04, A7:35.6,
+               B1:40.5, B2:38.68, B3:35.6, B5:38.04, B6:38.04, B7:34.86};
+  var STACKS = ["A1","A2","A3","A5","A6","A7","B1","B2","B3","B5","B6","B7"];
+  var FLOOR_MIN = 2, FLOOR_MAX = 22;
+
   function yuan(x){ return Math.round(x).toLocaleString("zh-TW"); }
   function wan(x){ var v = Math.round(x*10)/10; return v.toLocaleString("zh-TW",{maximumFractionDigits:1}); }
   function pmt(P, r, n){
@@ -167,12 +196,19 @@
       instRate:g("instRate"), discountPct:g("discountPct"),
       mortRate:g("mortRate"), mortYears:Math.max(1,Math.round(g("mortYears"))),
       graceYears:Math.max(0,Math.round(g("graceYears"))),
+      stack:$("stack").value, floor:$("floor").value,
+      parkings:parkings.map(function(p){ return {no:p.no, price:p.price}; }),
       payMode:document.querySelector("input[name=payMode]:checked").value
     };
   }
 
   function compute(s){
     var r = {};
+    // 戶別面積與車位
+    r.area = AREAS[s.stack] || 0;
+    r.parkTotal = (s.parkings || []).reduce(function(t, p){ return t + (parseFloat(p.price) || 0); }, 0);
+    r.housePrice = s.price - r.parkTotal;
+    r.unitPrice = r.area > 0 ? r.housePrice / r.area : 0;   // 萬/坪
     // 進位規則：簽約金無條件進位、貸款無條件捨去，自備款以差額調整補足
     r.signAmt = Math.ceil(s.price*s.signPct/100);
     r.loanAmt = Math.floor(s.price*s.loanPct/100);
@@ -262,6 +298,11 @@
     var dateStr = d.getFullYear() + " / " + (d.getMonth()+1) + " / " + d.getDate();
     var y = 252;
     text(s.planName, M, y, 36, {w:700});
+    if(r.area > 0){
+      ctx.font = font(36, 700);
+      var nmW = ctx.measureText(s.planName).width;
+      text(s.stack + " 棟 " + s.floor + " 樓・總建坪 " + r.area + " 坪", M + nmW + 30, y, 30, {color:GRAY});
+    }
     text(dateStr, CW-M, y, 28, {align:"right", color:GRAY});
 
     // ── 款項結構 ──
@@ -283,6 +324,19 @@
       text("萬", cx + ctx.measureText(c[1]).width + 8, y+72, 28, {color:GRAY});
     });
     y += 140;
+    // 房屋單價與車位明細（有選戶別或有車位時顯示）
+    if(r.area > 0 || r.parkTotal > 0){
+      var parts = [];
+      if(r.area > 0) parts.push("房屋 " + wan(r.housePrice) + " 萬・單價 " + (Math.round(r.unitPrice*10)/10).toFixed(1) + " 萬/坪");
+      else parts.push("房屋 " + wan(r.housePrice) + " 萬");
+      if(r.parkTotal > 0){
+        var nos = s.parkings.filter(function(p){ return (parseFloat(p.price)||0) > 0 || (p.no||"").trim(); })
+                            .map(function(p){ return ((p.no||"").trim() || "未編號") + " " + wan(parseFloat(p.price)||0) + " 萬"; });
+        parts.push("車位 " + wan(r.parkTotal) + " 萬（" + nos.join("、") + "）");
+      }
+      text(parts.join("　｜　"), M, y, 28, {color:GRAY});
+      y += 52;
+    }
     rule(y); y += 76;
 
     // ── 自備款 ──
@@ -361,6 +415,10 @@
   function refresh(){
     var g = function(id){ return parseFloat($(id).value) || 0; };
     $("pctWarn").classList.toggle("show", Math.abs(g("signPct")+g("selfPct")+g("loanPct")-100) > 0.01);
+    var st = $("stack").value;
+    $("areaInfo").textContent = st
+      ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + AREAS[st] + " 坪"
+      : "尚未選擇戶別";
     draw();
   }
   ["planName","price","signPct","loanPct","selfPct","instN","instGap","instRate",
@@ -372,6 +430,50 @@
   });
   document.querySelectorAll("input[name=payMode]").forEach(function(el){
     el.addEventListener("change", refresh);
+  });
+
+  // ---------- 戶別選單與車位 ----------
+  (function initUnitSelects(){
+    var stSel = $("stack"), flSel = $("floor");
+    STACKS.forEach(function(st){
+      var o = document.createElement("option");
+      o.value = st; o.textContent = st + " 棟";
+      stSel.appendChild(o);
+    });
+    for(var f = FLOOR_MIN; f <= FLOOR_MAX; f++){
+      var o = document.createElement("option");
+      o.value = f; o.textContent = f + " 樓";
+      flSel.appendChild(o);
+    }
+    stSel.addEventListener("change", refresh);
+    flSel.addEventListener("change", refresh);
+  })();
+
+  var parkings = [];
+  function renderParks(){
+    var box = $("parkList");
+    box.innerHTML = "";
+    parkings.forEach(function(p, i){
+      var row = document.createElement("div"); row.className = "parkRow";
+      var no = document.createElement("input");
+      no.type = "text"; no.className = "no"; no.placeholder = "車位編號";
+      no.value = p.no || "";
+      no.addEventListener("input", function(){ p.no = no.value; draw(); });
+      var pr = document.createElement("input");
+      pr.type = "number"; pr.className = "pr"; pr.placeholder = "價款(萬)"; pr.min = "0";
+      pr.value = p.price;
+      pr.addEventListener("input", function(){ p.price = pr.value; draw(); });
+      var rm = document.createElement("button");
+      rm.type = "button"; rm.className = "rm"; rm.textContent = "×";
+      rm.title = "移除車位"; rm.setAttribute("aria-label", "移除車位 " + (i+1));
+      rm.addEventListener("click", function(){ parkings.splice(i, 1); renderParks(); draw(); });
+      row.appendChild(no); row.appendChild(pr); row.appendChild(rm);
+      box.appendChild(row);
+    });
+  }
+  $("addPark").addEventListener("click", function(){
+    parkings.push({no:"", price:""});
+    renderParks(); draw();
   });
 
   // ---------- 一次付清隱藏入口（連點標誌 3 下或 Ctrl+Shift+L） ----------
@@ -426,6 +528,10 @@
      "discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
       if(s[id] !== undefined) $(id).value = s[id];
     });
+    $("stack").value = s.stack || "";
+    $("floor").value = s.floor || FLOOR_MIN;
+    parkings = (s.parkings || []).map(function(p){ return {no:p.no, price:p.price}; });
+    renderParks();
     if(s.payMode === "lump" && !lumpUnlocked) setLump(true);
     document.querySelector("input[name=payMode][value=" + s.payMode + "]").checked = true;
     refresh();
