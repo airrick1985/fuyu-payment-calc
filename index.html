@@ -175,9 +175,17 @@
   var GREEN = "#2E6B4E", INK = "#26322B", GRAY = "#6C7A72", LINE = "#D8E0DA", GOLD = "#A5812F";
   var FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif';
 
-  // 面積資料來源：1141007森之樹誤差表(成屋for銷售版本).xls「總建坪(建物)(坪)」，各棟別 2~22 樓面積相同
-  var AREAS = {A1:38.68, A2:40.5, A3:34.86, A5:38.04, A6:38.04, A7:35.6,
-               B1:40.5, B2:38.68, B3:35.6, B5:38.04, B6:38.04, B7:34.86};
+  // 面積資料來源：1141007森之樹誤差表(成屋for銷售版本).xls 工作表「誤差表2」
+  // 之「總建坪(建物)(坪)」欄（不含車位面積）；2樓與 3~22樓 部分戶別面積不同
+  var AREA_F2  = {A1:38.21, A2:39.81, A3:34.18, A5:37.5,  A6:37.5,  A7:34.75,
+                  B1:39.81, B2:38.21, B3:34.75, B5:37.5,  B6:37.5,  B7:34.18};
+  var AREA_F3P = {A1:38.21, A2:39.81, A3:34.19, A5:37.51, A6:37.51, A7:34.75,
+                  B1:39.81, B2:38.21, B3:34.75, B5:37.51, B6:37.51, B7:34.19};
+  function areaOf(stack, floor){
+    if(!stack) return 0;
+    var t = (parseInt(floor, 10) === 2) ? AREA_F2 : AREA_F3P;
+    return t[stack] || 0;
+  }
   var STACKS = ["A1","A2","A3","A5","A6","A7","B1","B2","B3","B5","B6","B7"];
   var FLOOR_MIN = 2, FLOOR_MAX = 22;
 
@@ -209,7 +217,7 @@
   function compute(s){
     var r = {};
     // 戶別面積與車位
-    r.area = AREAS[s.stack] || 0;
+    r.area = areaOf(s.stack, s.floor);
     r.parkTotal = (s.parkings || []).reduce(function(t, p){ return t + (parseFloat(p.price) || 0); }, 0);
     r.housePrice = s.price - r.parkTotal;
     r.unitPrice = r.area > 0 ? r.housePrice / r.area : 0;   // 萬/坪
@@ -440,7 +448,7 @@
       Math.abs(g("signPct")+g("sealPct")+g("taxPct")+g("closePct")+g("loanPct")-100) > 0.01);
     var st = $("stack").value;
     $("areaInfo").textContent = st
-      ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + AREAS[st] + " 坪"
+      ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + areaOf(st, $("floor").value) + " 坪"
       : "尚未選擇戶別";
     draw();
   }
