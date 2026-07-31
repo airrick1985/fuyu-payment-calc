@@ -357,7 +357,7 @@
       else parts.push("房屋 " + wan(r.housePrice) + " 萬");
       if(r.parkTotal > 0){
         var nos = s.parkings.filter(function(p){ return (parseFloat(p.price)||0) > 0 || (p.no||"").trim(); })
-                            .map(function(p){ return ((p.no||"").trim() || "未編號") + " " + wan(parseFloat(p.price)||0) + " 萬"; });
+                            .map(function(p){ return ((p.no||"").trim() || "未編號") + "／" + wan(parseFloat(p.price)||0) + "萬"; });
         parts.push("車位 " + wan(r.parkTotal) + " 萬（" + nos.join("、") + "）");
       }
       text(parts.join("　｜　"), M, y, 28, {color:GRAY});
