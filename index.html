@@ -527,18 +527,16 @@
     a.click();
   });
 
-  // ---------- 方案 ----------
-  var KEY = "fysj-plans-v2";
+  // ---------- 方案（僅供當次使用，不落地儲存；重新整理或重開瀏覽器即清空） ----------
   var plans = [];
-  try{ plans = JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ plans = []; }
-  function savePlans(){ try{ localStorage.setItem(KEY, JSON.stringify(plans)); }catch(e){} }
+  try{ localStorage.removeItem("fysj-plans-v1"); localStorage.removeItem("fysj-plans-v2"); }catch(e){}
 
   function nextName(){
     return "方案 " + String.fromCharCode(65 + (plans.length % 26));
   }
   $("saveBtn").addEventListener("click", function(){
     plans.push(readInputs());
-    savePlans(); renderChips();
+    renderChips();
     $("planName").value = nextName();
     refresh();
   });
@@ -572,7 +570,7 @@
       nm.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); loadPlan(i); } });
       var x = document.createElement("button"); x.className = "x"; x.textContent = "×";
       x.title = "刪除"; x.setAttribute("aria-label","刪除 " + p.planName);
-      x.addEventListener("click", function(){ plans.splice(i,1); savePlans(); renderChips(); });
+      x.addEventListener("click", function(){ plans.splice(i,1); renderChips(); });
       chip.appendChild(nm); chip.appendChild(x);
       box.appendChild(chip);
     });
