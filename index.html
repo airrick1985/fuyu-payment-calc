@@ -252,7 +252,8 @@
     r.mortMonthly = nGrace > 0 ? r.gracePay : r.mortPay;
     r.instMonthly = s.payMode === "installment" ? r.instPay/s.instGap : 0;
     r.monthTotal = r.mortMonthly + r.instMonthly;
-    r.needCash = s.payMode === "lump" ? r.lumpPay : r.signTotal + r.selfAmt;
+    // 一次付清仍須付足全額自備款，折讓於交屋時結算退款
+    r.needCash = r.signTotal + r.selfAmt;
     return r;
   }
 
@@ -383,9 +384,10 @@
       y = row("分期總利息", yuan(r.instInterest) + " 元", y);
     }else{
       y = sectionTitle("自備款・一次付清（交屋前）", y);
-      y = bigRow("折讓後實付", wan(r.lumpPay), "萬", y+14);
-      y = row("自備款總額 " + (Math.round((100 - s.loanPct)*10)/10) + "%（簽約含訂＋自備）", wan(r.lumpBase) + " 萬", y+6);
-      y = row("折讓 " + s.discountPct + "%", "− " + wan(r.discount) + " 萬（約 " + yuan(r.discount*W) + " 元）", y, {color:GOLD});
+      y = bigRow("自備款應付總額", wan(r.lumpBase), "萬", y+14);
+      y = row("比例 " + (Math.round((100 - s.loanPct)*10)/10) + "%（簽約含訂＋自備，須付足）", wan(r.lumpBase) + " 萬", y+6);
+      y = row("折讓 " + s.discountPct + "%（交屋時結算退款）", "− " + wan(r.discount) + " 萬（約 " + yuan(r.discount*W) + " 元）", y, {color:GOLD});
+      y = row("折讓結算後實質負擔", wan(r.lumpPay) + " 萬", y);
     }
     y += 18; rule(y); y += 76;
 
@@ -418,9 +420,9 @@
 
     // ── 交屋前需準備 ──
     var prep = s.payMode === "lump"
-      ? "自備款 " + wan(r.lumpBase) + " 萬 − 折讓 " + wan(r.discount) + " 萬"
-      : "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）";
-    y = row("交屋前需準備", prep + " ＝ " + wan(r.needCash) + " 萬", y, {size:34, vw:700});
+      ? "自備款 " + wan(r.needCash) + " 萬（折讓 " + wan(r.discount) + " 萬於交屋結算退款）"
+      : "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）＝ " + wan(r.needCash) + " 萬";
+    y = row("交屋前需準備", prep, y, {size:34, vw:700});
 
     // ── 審核提醒 ──
     y += 26;
