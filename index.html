@@ -114,11 +114,14 @@
       <div class="f"><label for="planName">方案名稱</label><input type="text" id="planName" value="方案 A"></div>
       <div class="grid2">
         <div class="f"><label for="price">成交價（萬）</label><input type="number" id="price" value="" placeholder="輸入金額" step="1" min="0"></div>
-        <div class="f"><label for="signPct">簽約金（%）</label><input type="number" id="signPct" value="5" step="0.5" min="0"></div>
+        <div class="f"><label for="deposit">訂金（萬，固定）</label><input type="number" id="deposit" value="10" step="1" min="0"></div>
+        <div class="f"><label for="signPct">簽約金含訂（%）</label><input type="number" id="signPct" value="10" step="0.5" min="0"></div>
+        <div class="f"><label for="sealPct">備件用印（%）</label><input type="number" id="sealPct" value="2.5" step="0.5" min="0"></div>
+        <div class="f"><label for="taxPct">稅單核發（%）</label><input type="number" id="taxPct" value="2.5" step="0.5" min="0"></div>
+        <div class="f"><label for="closePct">交屋款（%）</label><input type="number" id="closePct" value="5" step="0.5" min="0"></div>
         <div class="f"><label for="loanPct">貸款成數（%）</label><input type="number" id="loanPct" value="80" step="1" min="0"></div>
-        <div class="f"><label for="selfPct">自備款（%）</label><input type="number" id="selfPct" value="15" step="0.5" min="0"></div>
       </div>
-      <div class="warn-note" id="pctWarn">合計不等於 100%</div>
+      <div class="warn-note" id="pctWarn">各期比例合計不等於 100%</div>
 
       <h2>戶別與車位</h2>
       <div class="grid2">
@@ -191,7 +194,8 @@
     var g = function(id){ return parseFloat($(id).value) || 0; };
     return {
       planName: $("planName").value || "方案",
-      price:g("price"), signPct:g("signPct"), loanPct:g("loanPct"), selfPct:g("selfPct"),
+      price:g("price"), deposit:g("deposit"), signPct:g("signPct"),
+      sealPct:g("sealPct"), taxPct:g("taxPct"), closePct:g("closePct"), loanPct:g("loanPct"),
       instN:Math.max(1,Math.round(g("instN"))), instGap:Math.max(1,Math.round(g("instGap"))),
       instRate:g("instRate"), discountPct:g("discountPct"),
       mortRate:g("mortRate"), mortYears:Math.max(1,Math.round(g("mortYears"))),
@@ -209,18 +213,24 @@
     r.parkTotal = (s.parkings || []).reduce(function(t, p){ return t + (parseFloat(p.price) || 0); }, 0);
     r.housePrice = s.price - r.parkTotal;
     r.unitPrice = r.area > 0 ? r.housePrice / r.area : 0;   // 萬/坪
-    // 進位規則：簽約金無條件進位、貸款無條件捨去，自備款以差額調整補足
-    r.signAmt = Math.ceil(s.price*s.signPct/100);
-    r.loanAmt = Math.floor(s.price*s.loanPct/100);
-    r.selfAmt = Math.max(0, s.price - r.signAmt - r.loanAmt);
+    // 付款明細進位規則：簽約(含訂)/用印/交屋 進位到整數、貸款退位到整數，
+    // 稅單核發以差額補平，使各期合計＝成交價
+    r.deposit = s.deposit;                                    // 訂金（固定）
+    r.signTotal = Math.ceil(s.price*s.signPct/100);           // 簽約含訂
+    r.signAmt = Math.max(0, r.signTotal - r.deposit);         // 簽約金（扣訂金）
+    r.sealAmt = Math.ceil(s.price*s.sealPct/100);             // 備件用印
+    r.closeAmt = Math.ceil(s.price*s.closePct/100);           // 交屋款
+    r.loanAmt = Math.floor(s.price*s.loanPct/100);            // 銀行貸款
+    r.taxAmt = Math.max(0, s.price - r.signTotal - r.sealAmt - r.closeAmt - r.loanAmt); // 稅單核發
+    r.selfAmt = r.sealAmt + r.taxAmt + r.closeAmt;            // 自備款（可分期部分）
 
     var perRate = s.instRate/100/12*s.instGap;
     r.instPay = pmt(r.selfAmt*W, perRate, s.instN);
     r.instInterest = r.instPay*s.instN - r.selfAmt*W;
     r.instMonths = s.instN*s.instGap;
 
-    // 一次付清＝付清全部自備款（簽約＋自備，共 20%），折讓以此總額計
-    r.lumpBase = r.signAmt + r.selfAmt;
+    // 一次付清＝付清全部自備款（簽約含訂＋自備，共 20%），折讓以此總額計
+    r.lumpBase = r.signTotal + r.selfAmt;
     r.discount = r.lumpBase*s.discountPct/100;
     r.lumpPay = r.lumpBase - r.discount;
 
@@ -234,7 +244,7 @@
     r.mortMonthly = nGrace > 0 ? r.gracePay : r.mortPay;
     r.instMonthly = s.payMode === "installment" ? r.instPay/s.instGap : 0;
     r.monthTotal = r.mortMonthly + r.instMonthly;
-    r.needCash = s.payMode === "lump" ? r.lumpPay : r.signAmt + r.selfAmt;
+    r.needCash = s.payMode === "lump" ? r.lumpPay : r.signTotal + r.selfAmt;
     return r;
   }
 
@@ -305,25 +315,41 @@
     }
     text(dateStr, CW-M, y, 28, {align:"right", color:GRAY});
 
-    // ── 款項結構 ──
-    y = sectionTitle("款項結構", y + 92);
-    var colW = (CW - 2*M)/4;
-    var cols = [
-      ["成交價", wan(s.price), ""],
-      ["簽約金 " + s.signPct + "%", wan(r.signAmt), ""],
-      ["自備款 " + s.selfPct + "%", wan(r.selfAmt), ""],
-      ["銀行貸款 " + (s.loanPct/10) + " 成", wan(r.loanAmt), ""]
-    ];
-    cols.forEach(function(c, i){
-      var cx = M + colW*i;
-      text(c[0], cx, y+6, 28, {color:GRAY});
-      ctx.font = font(28);
-      var uw = ctx.measureText(" 萬").width;
-      text(c[1], cx, y+72, 48, {w:700});
-      ctx.font = font(48, 700);
-      text("萬", cx + ctx.measureText(c[1]).width + 8, y+72, 28, {color:GRAY});
+    // ── 付款明細表 ──
+    y = sectionTitle("付款明細（單位：萬）", y + 92);
+    var widths = [130, 200, 220, 220, 210, 180, 234];
+    var xs = [M];
+    widths.forEach(function(w){ xs.push(xs[xs.length-1] + w); });
+    var h1 = 52, h2 = 64, h3 = 48, tH = h1 + h2 + h3;
+    ctx.strokeStyle = LINE; ctx.lineWidth = 2;
+    [0, h1, h1+h2, tH].forEach(function(dy){
+      ctx.beginPath(); ctx.moveTo(M, y+dy); ctx.lineTo(CW-M, y+dy); ctx.stroke();
     });
-    y += 140;
+    for(var vi = 0; vi < xs.length; vi++){
+      // 訂金與簽約金的 % 列合併，故該分隔線只畫到金額列底
+      var yEnd = (vi === 1) ? y + h1 + h2 : y + tH;
+      ctx.beginPath(); ctx.moveTo(xs[vi], y); ctx.lineTo(xs[vi], yEnd); ctx.stroke();
+    }
+    var payCells = [
+      {t:"訂金",     v:wan(r.deposit)},
+      {t:"簽約金",   v:wan(r.signAmt)},
+      {t:"備件用印", v:wan(r.sealAmt)},
+      {t:"稅單核發", v:wan(r.taxAmt)},
+      {t:"銀行貸款", v:wan(r.loanAmt)},
+      {t:"交屋款",   v:wan(r.closeAmt)},
+      {t:"總價",     v:wan(s.price)}
+    ];
+    payCells.forEach(function(c, i){
+      var cx = (xs[i] + xs[i+1]) / 2;
+      text(c.t, cx, y + h1 - 16, 26, {align:"center", color:GRAY});
+      text(c.v, cx, y + h1 + h2 - 20, 34, {align:"center", w:700});
+    });
+    var payPcts = [s.sealPct+"%", s.taxPct+"%", s.loanPct+"%", s.closePct+"%"];
+    text(s.signPct + "%", (xs[0] + xs[2]) / 2, y + tH - 15, 26, {align:"center", color:GRAY});
+    payPcts.forEach(function(p, i){
+      text(p, (xs[i+2] + xs[i+3]) / 2, y + tH - 15, 26, {align:"center", color:GRAY});
+    });
+    y += tH + 40;
     // 房屋單價與車位明細（有選戶別或有車位時顯示）
     if(r.area > 0 || r.parkTotal > 0){
       var parts = [];
@@ -343,13 +369,14 @@
     if(s.payMode === "installment"){
       y = sectionTitle("自備款・公司分期", y);
       y = bigRow("每期應繳", yuan(r.instPay), "元／期", y+14);
-      y = row("分期方式", s.instN + " 期・每 " + s.instGap + " 個月一期・共 " + r.instMonths + " 個月", y+6);
+      y = row("分期本金（用印＋稅單＋交屋）", wan(r.selfAmt) + " 萬", y+6);
+      y = row("分期方式", s.instN + " 期・每 " + s.instGap + " 個月一期・共 " + r.instMonths + " 個月", y);
       y = row("年利率（比照銀行）", s.instRate + " %", y);
       y = row("分期總利息", yuan(r.instInterest) + " 元", y);
     }else{
       y = sectionTitle("自備款・一次付清（交屋前）", y);
       y = bigRow("折讓後實付", wan(r.lumpPay), "萬", y+14);
-      y = row("自備款總額 " + (s.signPct + s.selfPct) + "%（簽約＋自備）", wan(r.lumpBase) + " 萬", y+6);
+      y = row("自備款總額 " + (Math.round((100 - s.loanPct)*10)/10) + "%（簽約含訂＋自備）", wan(r.lumpBase) + " 萬", y+6);
       y = row("折讓 " + s.discountPct + "%", "− " + wan(r.discount) + " 萬（約 " + yuan(r.discount*W) + " 元）", y, {color:GOLD});
     }
     y += 18; rule(y); y += 76;
@@ -384,7 +411,7 @@
     // ── 交屋前需準備 ──
     var prep = s.payMode === "lump"
       ? "自備款 " + wan(r.lumpBase) + " 萬 − 折讓 " + wan(r.discount) + " 萬"
-      : "簽約 " + wan(r.signAmt) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）";
+      : "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）";
     y = row("交屋前需準備", prep + " ＝ " + wan(r.needCash) + " 萬", y, {size:34, vw:700});
 
     // ── 審核提醒 ──
@@ -407,26 +434,19 @@
   }
 
   // ---------- 事件 ----------
-  function balance(changed){
-    var g = function(id){ return parseFloat($(id).value) || 0; };
-    if(changed === "selfPct") $("loanPct").value = +(100 - g("signPct") - g("selfPct")).toFixed(1);
-    else $("selfPct").value = +(100 - g("signPct") - g("loanPct")).toFixed(1);
-  }
   function refresh(){
     var g = function(id){ return parseFloat($(id).value) || 0; };
-    $("pctWarn").classList.toggle("show", Math.abs(g("signPct")+g("selfPct")+g("loanPct")-100) > 0.01);
+    $("pctWarn").classList.toggle("show",
+      Math.abs(g("signPct")+g("sealPct")+g("taxPct")+g("closePct")+g("loanPct")-100) > 0.01);
     var st = $("stack").value;
     $("areaInfo").textContent = st
       ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + AREAS[st] + " 坪"
       : "尚未選擇戶別";
     draw();
   }
-  ["planName","price","signPct","loanPct","selfPct","instN","instGap","instRate",
-   "discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
-    $(id).addEventListener("input", function(){
-      if(id==="signPct"||id==="loanPct"||id==="selfPct") balance(id);
-      refresh();
-    });
+  ["planName","price","deposit","signPct","sealPct","taxPct","closePct","loanPct",
+   "instN","instGap","instRate","discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
+    $(id).addEventListener("input", refresh);
   });
   document.querySelectorAll("input[name=payMode]").forEach(function(el){
     el.addEventListener("change", refresh);
@@ -524,8 +544,8 @@
   });
   function loadPlan(i){
     var s = plans[i];
-    ["planName","price","signPct","loanPct","selfPct","instN","instGap","instRate",
-     "discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
+    ["planName","price","deposit","signPct","sealPct","taxPct","closePct","loanPct",
+     "instN","instGap","instRate","discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
       if(s[id] !== undefined) $(id).value = s[id];
     });
     $("stack").value = s.stack || "";
