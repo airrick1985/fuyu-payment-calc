@@ -110,6 +110,17 @@
   <div class="layout">
     <!-- ===== 輸入 ===== -->
     <div class="panel">
+      <h2>戶別與車位</h2>
+      <div class="grid2">
+        <div class="f"><label for="stack">棟別</label>
+          <select id="stack"><option value="">— 選擇 —</option></select></div>
+        <div class="f"><label for="floor">樓層</label>
+          <select id="floor"></select></div>
+      </div>
+      <div class="areaNote" id="areaInfo">尚未選擇戶別</div>
+      <div id="parkList" style="display:flex; flex-direction:column; gap:6px"></div>
+      <button class="mini" id="addPark" type="button">＋ 新增車位</button>
+
       <h2>基本</h2>
       <div class="f"><label for="planName">方案名稱</label><input type="text" id="planName" value="方案 A"></div>
       <div class="grid2">
@@ -122,17 +133,6 @@
         <div class="f"><label for="loanPct">貸款成數（%）</label><input type="number" id="loanPct" value="80" step="1" min="0"></div>
       </div>
       <div class="warn-note" id="pctWarn">各期比例合計不等於 100%</div>
-
-      <h2>戶別與車位</h2>
-      <div class="grid2">
-        <div class="f"><label for="stack">棟別</label>
-          <select id="stack"><option value="">— 選擇 —</option></select></div>
-        <div class="f"><label for="floor">樓層</label>
-          <select id="floor"></select></div>
-      </div>
-      <div class="areaNote" id="areaInfo">尚未選擇戶別</div>
-      <div id="parkList" style="display:flex; flex-direction:column; gap:6px"></div>
-      <button class="mini" id="addPark" type="button">＋ 新增車位</button>
 
       <h2>自備款方式</h2>
       <div class="radio-row" role="radiogroup" aria-label="自備款方式">
