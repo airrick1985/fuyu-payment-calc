@@ -127,8 +127,8 @@
       <div class="grid2">
         <div class="f"><label for="price">成交價（萬）</label><input type="number" id="price" value="" placeholder="輸入金額" step="1" min="0"></div>
         <div class="f"><label for="deposit">訂金（萬，固定）</label><input type="number" id="deposit" value="10" step="1" min="0"></div>
-        <div class="f"><label for="signPct">簽約金含訂（%）</label><input type="number" id="signPct" value="10" step="0.5" min="0"></div>
-        <div class="f"><label for="closePct">交屋款（%）</label><input type="number" id="closePct" value="5" step="0.5" min="0"></div>
+        <div class="f"><label for="signPct">簽約金含訂（%）</label><input type="number" id="signPct" value="5" step="0.5" min="0"></div>
+        <div class="f"><label for="closePct" id="closeLabel">公司分期（%）</label><input type="number" id="closePct" value="15" step="0.5" min="0"></div>
         <div class="f"><label for="loanPct">貸款成數（%）</label><input type="number" id="loanPct" value="80" step="1" min="0"></div>
         <div class="f"><label for="sealPct">備件用印（%，自動）</label><input type="number" id="sealPct" value="2.5" readonly tabindex="-1"></div>
         <div class="f"><label for="taxPct">稅單核發（%，自動）</label><input type="number" id="taxPct" value="2.5" readonly tabindex="-1"></div>
@@ -346,7 +346,7 @@
       {t:"備件用印", v:wan(r.sealAmt)},
       {t:"稅單核發", v:wan(r.taxAmt)},
       {t:"銀行貸款", v:wan(r.loanAmt)},
-      {t:"交屋款",   v:wan(r.closeAmt)},
+      {t:(s.payMode === "installment" ? "公司分期" : "交屋款"), v:wan(r.closeAmt)},
       {t:"總價",     v:wan(s.price)}
     ];
     payCells.forEach(function(c, i){
@@ -379,7 +379,7 @@
     if(s.payMode === "installment"){
       y = sectionTitle("自備款・公司分期", y);
       y = bigRow("每期應繳", yuan(r.instPay), "元／期", y+14);
-      y = row("分期本金（用印＋稅單＋交屋）", wan(r.selfAmt) + " 萬", y+6);
+      y = row("分期本金（公司分期款）", wan(r.selfAmt) + " 萬", y+6);
       y = row("分期方式", s.instN + " 期・每 " + s.instGap + " 個月一期・共 " + r.instMonths + " 個月", y);
       y = row("年利率（比照銀行）", s.instRate + " %", y);
       y = row("分期總利息", yuan(r.instInterest) + " 元", y);
@@ -453,6 +453,9 @@
     $("sealPct").value = half;
     $("taxPct").value = half;
     $("pctWarn").classList.toggle("show", rest < -0.001);
+    $("closeLabel").textContent =
+      document.querySelector("input[name=payMode]:checked").value === "installment"
+        ? "公司分期（%）" : "交屋款（%）";
     var st = $("stack").value;
     $("areaInfo").textContent = st
       ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + areaOf(st, $("floor").value) + " 坪"
@@ -463,8 +466,13 @@
    "instN","instGap","instRate","discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
     $(id).addEventListener("input", refresh);
   });
+  // 依繳付方式套用預設比例：分期 5%簽約＋15%公司分期；一次付清 10%簽約＋5%交屋
+  function applyModeDefaults(mode){
+    if(mode === "installment"){ $("signPct").value = 5;  $("closePct").value = 15; }
+    else{                       $("signPct").value = 10; $("closePct").value = 5; }
+  }
   document.querySelectorAll("input[name=payMode]").forEach(function(el){
-    el.addEventListener("change", refresh);
+    el.addEventListener("change", function(){ applyModeDefaults(el.value); refresh(); });
   });
 
   // ---------- 戶別選單與車位 ----------
@@ -517,7 +525,10 @@
     lumpUnlocked = on;
     $("lumpOpt").hidden = !on;
     $("discountField").hidden = !on;
-    if(!on) document.querySelector("input[name=payMode][value=installment]").checked = true;
+    if(!on){
+      document.querySelector("input[name=payMode][value=installment]").checked = true;
+      applyModeDefaults("installment");
+    }
     refresh();
   }
   var taps = 0, tapTimer = null;
