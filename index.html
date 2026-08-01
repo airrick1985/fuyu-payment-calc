@@ -468,11 +468,11 @@
     if(s.agent !== "" && AGENTS[+s.agent]){
       var ag = AGENTS[+s.agent];
       ctx.fillStyle = GREEN;
-      rrect(M, CH-188, 6, 56, 3); ctx.fill();
-      text("銷 售 顧 問", M+30, CH-166, 23, {w:700, color:GOLD});
-      text(ag.name, M+30, CH-136, 36, {w:700});
+      rrect(M, CH-196, 6, 72, 3); ctx.fill();
+      text("銷 售 顧 問", M+30, CH-174, 23, {w:700, color:GOLD});
+      text(ag.name, M+30, CH-130, 36, {w:700});
       ctx.font = font(36, 700);
-      text(agentPhoneFmt(ag.phone), M+30+ctx.measureText(ag.name).width+28, CH-136, 32, {w:600, color:GREEN});
+      text(agentPhoneFmt(ag.phone), M+30+ctx.measureText(ag.name).width+28, CH-130, 32, {w:600, color:GREEN});
     }
 
     // 頁尾
