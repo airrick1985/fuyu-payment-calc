@@ -154,6 +154,10 @@
         <div class="f"><label for="mortYears">年限（年）</label><input type="number" id="mortYears" value="20" step="1" min="1"></div>
         <div class="f"><label for="graceYears">寬限（年）</label><input type="number" id="graceYears" value="0" step="1" min="0"></div>
       </div>
+
+      <h2>銷售顧問</h2>
+      <div class="f"><label for="agent">姓名・電話</label>
+        <select id="agent"><option value="">— 選擇 —</option></select></div>
     </div>
 
     <!-- ===== A4 預覽 ===== -->
@@ -191,6 +195,16 @@
   var STACKS = ["A1","A2","A3","A5","A6","A7","B1","B2","B3","B5","B6","B7"];
   var FLOOR_MIN = 2, FLOOR_MAX = 22;
 
+  // 銷售顧問名單（依姓名筆畫排序：李7 芝8／宥9、陳11、鄭15、賴16）
+  var AGENTS = [
+    {name:"李芝瑩", phone:"0932116274"},
+    {name:"李宥葳", phone:"0963662258"},
+    {name:"陳文賢", phone:"0980371014"},
+    {name:"鄭宛宜", phone:"0938875127"},
+    {name:"賴加霖", phone:"0905032672"}
+  ];
+  function agentPhoneFmt(p){ return p.replace(/^(\d{4})(\d{3})(\d{3})$/, "$1-$2-$3"); }
+
   function yuan(x){ return Math.round(x).toLocaleString("zh-TW"); }
   function wan(x){ var v = Math.round(x*10)/10; return v.toLocaleString("zh-TW",{maximumFractionDigits:1}); }
   function pmt(P, r, n){
@@ -212,6 +226,7 @@
       graceYears:Math.max(0,Math.round(g("graceYears"))),
       stack:$("stack").value, floor:$("floor").value,
       parkings:parkings.map(function(p){ return {no:p.no, price:p.price}; }),
+      agent:$("agent").value,
       payMode:document.querySelector("input[name=payMode]:checked").value
     };
   }
@@ -449,6 +464,17 @@
       text(noticeText, CW/2, y + nH/2 + 11, 30, {w:700, align:"center", color:"#7A5A17"});
     }
 
+    // ── 銷售顧問（左下） ──
+    if(s.agent !== "" && AGENTS[+s.agent]){
+      var ag = AGENTS[+s.agent];
+      ctx.fillStyle = GREEN;
+      rrect(M, CH-188, 6, 56, 3); ctx.fill();
+      text("銷 售 顧 問", M+30, CH-166, 23, {w:700, color:GOLD});
+      text(ag.name, M+30, CH-136, 36, {w:700});
+      ctx.font = font(36, 700);
+      text(agentPhoneFmt(ag.phone), M+30+ctx.measureText(ag.name).width+28, CH-136, 32, {w:600, color:GREEN});
+    }
+
     // 頁尾
     rule(CH-118);
     text("本表僅供試算參考，實際金額與條件以正式合約為準。", M, CH-64, 26, {color:GRAY});
@@ -502,6 +528,16 @@
     }
     stSel.addEventListener("change", refresh);
     flSel.addEventListener("change", refresh);
+  })();
+
+  (function initAgentSelect(){
+    var sel = $("agent");
+    AGENTS.forEach(function(a, i){
+      var o = document.createElement("option");
+      o.value = i; o.textContent = a.name + "　" + agentPhoneFmt(a.phone);
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", refresh);
   })();
 
   var parkings = [];
@@ -586,6 +622,7 @@
     });
     $("stack").value = s.stack || "";
     $("floor").value = s.floor || FLOOR_MIN;
+    $("agent").value = s.agent || "";
     parkings = (s.parkings || []).map(function(p){ return {no:p.no, price:p.price}; });
     renderParks();
     if(s.payMode === "lump" && !lumpUnlocked) setLump(true);
