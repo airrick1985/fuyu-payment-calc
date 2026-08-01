@@ -127,8 +127,8 @@
       <div class="grid2">
         <div class="f"><label for="price">成交價（萬）</label><input type="number" id="price" value="" placeholder="輸入金額" step="1" min="0"></div>
         <div class="f"><label for="deposit">訂金（萬，固定）</label><input type="number" id="deposit" value="10" step="1" min="0"></div>
-        <div class="f"><label for="signPct">簽約金含訂（%）</label><input type="number" id="signPct" value="5" step="0.5" min="0"></div>
-        <div class="f"><label for="closePct" id="closeLabel">公司分期（%）</label><input type="number" id="closePct" value="15" step="0.5" min="0"></div>
+        <div class="f"><label for="signPct">簽約金含訂（%）</label><input type="number" id="signPct" value="10" step="0.5" min="0"></div>
+        <div class="f"><label for="closePct" id="closeLabel">交屋款（%）</label><input type="number" id="closePct" value="5" step="0.5" min="0"></div>
         <div class="f"><label for="loanPct">貸款成數（%）</label><input type="number" id="loanPct" value="80" step="1" min="0"></div>
         <div class="f"><label for="sealPct">備件用印（%，自動）</label><input type="number" id="sealPct" value="2.5" readonly tabindex="-1"></div>
         <div class="f"><label for="taxPct">稅單核發（%，自動）</label><input type="number" id="taxPct" value="2.5" readonly tabindex="-1"></div>
@@ -137,10 +137,11 @@
 
       <h2>自備款方式</h2>
       <div class="radio-row" role="radiogroup" aria-label="自備款方式">
-        <label><input type="radio" name="payMode" value="installment" checked>公司分期</label>
+        <label><input type="radio" name="payMode" value="normal" checked>一般付款</label>
+        <label><input type="radio" name="payMode" value="installment">公司分期</label>
         <label id="lumpOpt" hidden><input type="radio" name="payMode" value="lump">一次付清</label>
       </div>
-      <div class="grid2" id="instFields">
+      <div class="grid2" id="instFields" hidden>
         <div class="f"><label for="instN">期數</label><input type="number" id="instN" value="12" step="1" min="1"></div>
         <div class="f"><label for="instGap">間隔（月）</label><input type="number" id="instGap" value="3" step="1" min="1"></div>
         <div class="f"><label for="instRate">利率（%）</label><input type="number" id="instRate" value="3.3" step="0.05" min="0"></div>
@@ -383,6 +384,13 @@
       y = row("分期方式", s.instN + " 期・每 " + s.instGap + " 個月一期・共 " + r.instMonths + " 個月", y);
       y = row("年利率（比照銀行）", s.instRate + " %", y);
       y = row("分期總利息", yuan(r.instInterest) + " 元", y);
+    }else if(s.payMode === "normal"){
+      y = sectionTitle("自備款・一般付款", y);
+      y = bigRow("自備款總額", wan(r.needCash), "萬", y+14);
+      y = row("簽約含訂（" + s.signPct + "%）", wan(r.signTotal) + " 萬", y+6);
+      y = row("備件用印（" + s.sealPct + "%）", wan(r.sealAmt) + " 萬", y);
+      y = row("稅單核發（" + s.taxPct + "%）", wan(r.taxAmt) + " 萬", y);
+      y = row("交屋款（" + s.closePct + "%）", wan(r.closeAmt) + " 萬", y);
     }else{
       y = sectionTitle("自備款・一次付清（交屋前）", y);
       y = bigRow("自備款應付總額", wan(r.lumpBase), "萬", y+14);
@@ -422,20 +430,24 @@
     // ── 交屋前需準備 ──
     var prep = s.payMode === "lump"
       ? "自備款 " + wan(r.needCash) + " 萬（折讓 " + wan(r.discount) + " 萬於交屋結算退款）"
-      : "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）＝ " + wan(r.needCash) + " 萬";
+      : s.payMode === "installment"
+      ? "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬（可分期）＝ " + wan(r.needCash) + " 萬"
+      : "簽約含訂 " + wan(r.signTotal) + " 萬 ＋ 自備 " + wan(r.selfAmt) + " 萬 ＝ " + wan(r.needCash) + " 萬";
     y = row("交屋前需準備", prep, y, {size:34, vw:700});
 
-    // ── 審核提醒 ──
-    y += 26;
-    var nH = 104;
-    ctx.fillStyle = "#FBF3E1";
-    rrect(M, y, CW-2*M, nH, 12); ctx.fill();
-    ctx.strokeStyle = "#C9A24B"; ctx.lineWidth = 3;
-    rrect(M, y, CW-2*M, nH, 12); ctx.stroke();
-    var noticeText = s.payMode === "lump"
-      ? "※ 重要提醒：一次付清折讓方案，須送審客戶條件，經公司審核通過後方可簽約。"
-      : "※ 重要提醒：公司分期方案，須送審客戶條件，經公司審核通過後方可簽約。";
-    text(noticeText, CW/2, y + nH/2 + 11, 30, {w:700, align:"center", color:"#7A5A17"});
+    // ── 審核提醒（一般付款不需送審） ──
+    if(s.payMode !== "normal"){
+      y += 26;
+      var nH = 104;
+      ctx.fillStyle = "#FBF3E1";
+      rrect(M, y, CW-2*M, nH, 12); ctx.fill();
+      ctx.strokeStyle = "#C9A24B"; ctx.lineWidth = 3;
+      rrect(M, y, CW-2*M, nH, 12); ctx.stroke();
+      var noticeText = s.payMode === "lump"
+        ? "※ 重要提醒：一次付清折讓方案，須送審客戶條件，經公司審核通過後方可簽約。"
+        : "※ 重要提醒：公司分期方案，須送審客戶條件，經公司審核通過後方可簽約。";
+      text(noticeText, CW/2, y + nH/2 + 11, 30, {w:700, align:"center", color:"#7A5A17"});
+    }
 
     // 頁尾
     rule(CH-118);
@@ -453,9 +465,9 @@
     $("sealPct").value = half;
     $("taxPct").value = half;
     $("pctWarn").classList.toggle("show", rest < -0.001);
-    $("closeLabel").textContent =
-      document.querySelector("input[name=payMode]:checked").value === "installment"
-        ? "公司分期（%）" : "交屋款（%）";
+    var mode = document.querySelector("input[name=payMode]:checked").value;
+    $("closeLabel").textContent = mode === "installment" ? "公司分期（%）" : "交屋款（%）";
+    $("instFields").hidden = (mode === "normal");
     var st = $("stack").value;
     $("areaInfo").textContent = st
       ? st + " 棟 " + $("floor").value + " 樓・總建坪 " + areaOf(st, $("floor").value) + " 坪"
@@ -466,7 +478,7 @@
    "instN","instGap","instRate","discountPct","mortRate","mortYears","graceYears"].forEach(function(id){
     $(id).addEventListener("input", refresh);
   });
-  // 依繳付方式套用預設比例：分期 5%簽約＋15%公司分期；一次付清 10%簽約＋5%交屋
+  // 依繳付方式套用預設比例：一般付款／一次付清 10%簽約＋5%交屋；分期 5%簽約＋15%公司分期
   function applyModeDefaults(mode){
     if(mode === "installment"){ $("signPct").value = 5;  $("closePct").value = 15; }
     else{                       $("signPct").value = 10; $("closePct").value = 5; }
@@ -525,9 +537,9 @@
     lumpUnlocked = on;
     $("lumpOpt").hidden = !on;
     $("discountField").hidden = !on;
-    if(!on){
-      document.querySelector("input[name=payMode][value=installment]").checked = true;
-      applyModeDefaults("installment");
+    if(!on && document.querySelector("input[name=payMode][value=lump]").checked){
+      document.querySelector("input[name=payMode][value=normal]").checked = true;
+      applyModeDefaults("normal");
     }
     refresh();
   }
